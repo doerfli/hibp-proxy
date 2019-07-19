@@ -10,7 +10,7 @@ end
 $redis = Redis.new(url: ENV['REDIS_URL'])
 
 API_KEY = ENV['HIBP_API_KEY']
-REQUEST_INTERVAL = 1550
+REQUEST_INTERVAL = 2100
 
 class BgWorker
   include Sidekiq::Worker
@@ -30,10 +30,13 @@ class BgWorker
     puts "retrieving #{email}"
     url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{email}"
     begin
-      response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY)
+      response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY, :user_agent => "hibp-proxy_for_hacked_android_app")
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
       puts response
-      # TODO push response via firebase 
+      # TODO push response via firebase
+    rescue RestClient::NotFound
+      puts "no breach found"
+      $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
     rescue RestClient::TooManyRequests => e
       delay = e.response.headers[:retry_after].to_i
       puts "got 429 with requested delay #{delay}"
