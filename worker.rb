@@ -33,7 +33,7 @@ class BgWorker
     rescue RestClient::NotFound
       puts "no breach found"
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
-      send_response(email, device_token, '{}')
+      send_response(email, device_token, '[]')
     rescue RestClient::TooManyRequests => e
       delay = e.response.headers[:retry_after].to_i
       puts "got 429 with requested delay #{delay}"
