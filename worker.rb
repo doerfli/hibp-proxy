@@ -26,6 +26,17 @@ class BgWorker
     key = "data_#{req_id}"
     data_json = $redis.get(key)
     email, device_token = JSON.parse(data_json)
+
+    if email.nil? || email.empty?
+      puts "ERROR - account was empty"
+      return
+    end
+
+    if device_token.nil? || device_token.empty?
+      puts "ERROR - device_token for account #{email} was empty"
+      return
+    end
+
     puts "#{key} checking #{email} / #{device_token}"
     url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{email}"
 
@@ -43,7 +54,7 @@ class BgWorker
       $redis.del(key)
     rescue RestClient::TooManyRequests => e
       delay = e.response.headers[:retry_after].to_i
-      puts "response status 429 with requested delay #{delay}"
+      puts "WARN - response status 429 with requested delay #{delay}"
       $redis.set("next_request_at", epoch_ms + delay * 1000)
       raise e
     end

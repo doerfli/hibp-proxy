@@ -15,6 +15,12 @@ class Web < Sinatra::Application
     req_id = SecureRandom.uuid
     email = params[:email]
     device_token = params[:device_token]
+
+    if device_token.empty?
+      puts "ERROR - device_token empty"
+      return
+    end
+
     key = "data_#{req_id}"
     puts "#{key} #{email} - #{device_token}"
     $redis.set(key, [email, device_token].to_json)
