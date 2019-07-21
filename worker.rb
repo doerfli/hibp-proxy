@@ -27,7 +27,7 @@ class BgWorker
     data_json = $redis.get(key)
     email, device_token = JSON.parse(data_json)
 
-    #puts "retrieving #{email}"
+    puts "checking #{email} / #{device_token}"
     url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{email}"
 
     begin
