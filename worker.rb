@@ -22,21 +22,21 @@ class BgWorker
   def perform(email, device_token)
     sleepIfRequired
 
-    puts "retrieving #{email}"
+    #puts "retrieving #{email}"
     url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{email}"
     begin
       response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY, :user_agent => "hibp-proxy_for_hacked_android_app")
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
-      puts response
-      # TODO push response via firebase
+      #puts response
+      puts "response status 20x - successful"
       send_response(email, device_token, response)
     rescue RestClient::NotFound
-      puts "no breach found"
+      puts "response status 404 - no breach found"
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
       send_response(email, device_token, '[]')
     rescue RestClient::TooManyRequests => e
       delay = e.response.headers[:retry_after].to_i
-      puts "got 429 with requested delay #{delay}"
+      puts "response status 429 with requested delay #{delay}"
       $redis.set("next_request_at", epoch_ms + delay * 1000)
       raise e
     end
@@ -74,12 +74,13 @@ class BgWorker
                       Authorization: "Bearer #{access_token}",
                       Accept: :json
                     })
-    puts response
+    #puts response
+    puts "fcm sent"
   end
 
   def get_access_token
     if epoch_ms > @@expiration
-      puts "generating new token"
+      puts "generating new access_token"
       scope = 'https://www.googleapis.com/auth/firebase.messaging'
       authorizer = Google::Auth::ServiceAccountCredentials.make_creds(
         scope: scope

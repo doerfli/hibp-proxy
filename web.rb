@@ -10,7 +10,8 @@ class Web < Sinatra::Application
   get '/search' do
     email = params[:email]
     device_token = params[:device_token]
+    #puts "#{email} - #{device_token}"
     BgWorker.perform_async(email, device_token)
-    "enqueued #{email} for #{device_token}"
+    "enqueued request for #{device_token}"
   end
 end
