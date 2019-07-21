@@ -2,6 +2,7 @@ require 'sidekiq'
 require 'rest-client'
 require 'date'
 require 'googleauth'
+require "json"
 
 Sidekiq.configure_client do |config|
   config.redis = { url: ENV['REDIS_URL'] }
@@ -19,21 +20,28 @@ class BgWorker
   @@access_token = nil
   @@expiration = 0
 
-  def perform(email, device_token)
+  def perform(req_id)
     sleepIfRequired
+
+    key = "data_#{req_id}"
+    data_json = $redis.get(key)
+    email, device_token = JSON.parse(data_json)
 
     #puts "retrieving #{email}"
     url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{email}"
+
     begin
       response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY, :user_agent => "hibp-proxy_for_hacked_android_app")
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
       #puts response
       puts "response status 20x - successful"
       send_response(email, device_token, response)
+      $redis.del(key)
     rescue RestClient::NotFound
       puts "response status 404 - no breach found"
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
       send_response(email, device_token, '[]')
+      $redis.del(key)
     rescue RestClient::TooManyRequests => e
       delay = e.response.headers[:retry_after].to_i
       puts "response status 429 with requested delay #{delay}"

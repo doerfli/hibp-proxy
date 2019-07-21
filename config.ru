@@ -1,7 +1,13 @@
 require './web'
 require 'sidekiq/web'
 
-run Rack::URLMap.new(
-  '/' => Web,
-  # '/sidekiq' => Sidekiq::Web
-)
+if ENV['ENABLE_SIDEKIQ_WEB']
+  run Rack::URLMap.new(
+    '/' => Web,
+    '/sidekiq' => Sidekiq::Web
+  )
+else
+  run Rack::URLMap.new(
+    '/' => Web
+  )
+end
