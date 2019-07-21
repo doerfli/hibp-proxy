@@ -11,7 +11,7 @@ end
 $redis = Redis.new(url: ENV['REDIS_URL'])
 
 API_KEY = ENV['HIBP_API_KEY']
-REQUEST_INTERVAL = 2100
+REQUEST_INTERVAL = 1700
 FIREBASE_PROJECT_ID = ENV['FIREBASE_PROJECT_ID']
 
 class BgWorker
@@ -26,8 +26,7 @@ class BgWorker
     key = "data_#{req_id}"
     data_json = $redis.get(key)
     email, device_token = JSON.parse(data_json)
-
-    puts "checking #{email} / #{device_token}"
+    #puts "checking #{email} / #{device_token}"
     url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{email}"
 
     begin

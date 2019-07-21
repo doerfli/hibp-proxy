@@ -15,7 +15,7 @@ class Web < Sinatra::Application
     req_id = SecureRandom.uuid
     email = params[:email]
     device_token = params[:device_token]
-    puts "#{email} - #{device_token}"
+    #puts "#{email} - #{device_token}"
     $redis.set("data_#{req_id}", [email, device_token].to_json)
     BgWorker.perform_async(req_id)
     "enqueued request for #{device_token}"
