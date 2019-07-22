@@ -2,7 +2,7 @@ require 'sidekiq'
 require 'rest-client'
 require 'date'
 require 'googleauth'
-require "json"
+require 'json'
 
 Sidekiq.configure_client do |config|
   config.redis = { url: ENV['REDIS_URL'] }
@@ -25,32 +25,32 @@ class BgWorker
 
     key = "data_#{req_id}"
     data_json = $redis.get(key)
-    email, device_token = JSON.parse(data_json)
+    account, device_token = JSON.parse(data_json)
 
-    if email.nil? || email.empty?
+    if account.nil? || account.empty?
       puts "ERROR - account was empty"
       return
     end
 
     if device_token.nil? || device_token.empty?
-      puts "ERROR - device_token for account #{email} was empty"
+      puts "ERROR - device_token for account #{account} was empty"
       return
     end
 
-    puts "#{key} checking #{email} / #{device_token}"
-    url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{email}"
+    puts "#{key} checking #{account} / #{device_token}"
+    url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{account}"
 
     begin
-      response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY, :user_agent => "hibp-proxy_for_hacked_android_app")
+      response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY, :user_agent => 'hibp-proxy_for_hacked_android_app')
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
       #puts response
       puts "response status 20x - successful"
-      send_response(email, device_token, response)
+      send_response(account, device_token, response)
       $redis.del(key)
     rescue RestClient::NotFound
       puts "response status 404 - no breach found"
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
-      send_response(email, device_token, '[]')
+      send_response(account, device_token, '[]')
       $redis.del(key)
     rescue RestClient::TooManyRequests => e
       delay = e.response.headers[:retry_after].to_i
@@ -74,7 +74,7 @@ class BgWorker
     end
   end
 
-  def send_response(email, device_token, response)
+  def send_response(account, device_token, response)
     access_token = get_access_token
     url = "https://fcm.googleapis.com/v1/projects/#{FIREBASE_PROJECT_ID}/messages:send"
     response = RestClient.post(url,
@@ -82,7 +82,7 @@ class BgWorker
                       message: {
                         token: device_token,
                         data: {
-                          account: email,
+                          account: account,
                           type: 'hibp-response',
                           response: response
                         }

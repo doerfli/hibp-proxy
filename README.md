@@ -7,7 +7,7 @@ The result of the query is sent to an Android Device via Google Firebase Messagi
 
 Start the service using `forego`. 
 
-Then send a HTTP `GET` request to `<hostname>:<port>/search?email=<email>&device_token=<firebase-device-token>`. 
+Then send a HTTP `GET` request to `<hostname>:<port>/search?account=<account>&device_token=<firebase-device-token>`. 
 The response is sent back to the device identified by the `device_token`. 
  
 
