@@ -10,6 +10,8 @@ end
 
 $redis = Redis.new(url: ENV['REDIS_URL'])
 
+$stdout.sync = true
+
 class Web < Sinatra::Application
   get '/search' do
     req_id = SecureRandom.uuid
