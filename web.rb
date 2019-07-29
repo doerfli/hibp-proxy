@@ -31,7 +31,7 @@ class Web < Sinatra::Application
     end
 
     key = "data_#{req_id}"
-    puts "#{key} #{account} - #{device_token}"
+    #puts "#{key} #{account} - #{device_token}"
     $redis.set(key, [account, device_token].to_json)
     BgWorker.perform_async(req_id)
     "enqueued request for #{device_token}"

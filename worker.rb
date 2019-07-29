@@ -3,6 +3,7 @@ require 'rest-client'
 require 'date'
 require 'googleauth'
 require 'json'
+require 'uri'
 
 Sidekiq.configure_client do |config|
   config.redis = { url: ENV['REDIS_URL'] }
@@ -37,8 +38,9 @@ class BgWorker
       return
     end
 
-    puts "#{key} checking #{account} / #{device_token}"
-    url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{account}"
+    #puts "#{key} checking #{account} / #{device_token}"
+    url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{URI::encode(account)}"
+    #puts url
 
     begin
       response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY, :user_agent => 'hibp-proxy_for_hacked_android_app')
