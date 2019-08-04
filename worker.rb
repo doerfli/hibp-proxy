@@ -87,6 +87,9 @@ class BgWorker
                           account: account,
                           type: 'hibp-response',
                           response: response
+                        },
+                        fcmOptions: {
+                          analyticsLabel: "hibp-response"
                         }
                       }
                     }.to_json, {
