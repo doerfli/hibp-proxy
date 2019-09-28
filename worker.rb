@@ -23,9 +23,11 @@ def get_redis_url(baseurl)
   end
 end
 
+# get redis url
 redis_url = get_redis_url(ENV['HIBP_PROXY_BASE_URL'])
 puts "using redis url #{redis_url}"
 
+# configure sidekiq client and server (exception handling)
 Sidekiq.configure_client do |config|
   config.redis = { url: redis_url }
 end
@@ -56,30 +58,50 @@ class BgWorker
   @@expiration = 0
 
   def perform(req_id)
+    return if do_ping(req_id)
+
     sleepIfRequired
 
     key = "data_#{req_id}"
     data_json = $redis.get(key)
     account, device_token = JSON.parse(data_json)
 
+    return unless input_valid(account, device_token)
+
+    check_with_hibp_and_send_gcm(key, account, device_token)
+  end
+
+  def do_ping(req_id)
+    return false unless req_id == '__PING__'
+
+    puts 'executing ping request'
+    $redis.set(:worker_status, Time.now.to_i)
+    true
+  end
+
+  def input_valid(account, device_token)
     if account.nil? || account.empty?
-      puts "ERROR - account was empty"
-      return
+      puts 'ERROR - account was empty'
+      return false
     end
 
     if device_token.nil? || device_token.empty?
       puts "ERROR - device_token for account #{account} was empty"
-      return
+      return false
     end
 
-    #puts "#{key} checking #{account} / #{device_token}"
+    true
+  end
+
+  def check_with_hibp_and_send_gcm(key, account, device_token)
+    # puts "#{key} checking #{account} / #{device_token}"
     url = "https://haveibeenpwned.com/api/v3/breachedaccount/#{URI::encode(account)}"
-    #puts url
+    # puts url
 
     begin
       response = RestClient.get(url, 'Hibp-Api-Key' => API_KEY, :user_agent => 'hibp-proxy_for_hacked_android_app')
       $redis.set("next_request_at", epoch_ms + REQUEST_INTERVAL)
-      #puts response
+      # puts response
       puts "response status 20x - successful"
       send_response(account, device_token, response)
       $redis.del(key)

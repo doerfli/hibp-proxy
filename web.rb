@@ -48,4 +48,22 @@ class Web < Sinatra::Application
       REDIS_URL: ENV['REDIS_URL']
     }.to_json
   end
+
+  get '/ping' do
+    BgWorker.perform_async('__PING__')
+    return {
+      status: :ok
+    }.to_json
+  end
+
+  get '/monitor' do
+    last_ping_ms = $redis.get(:worker_status) || '0'
+    now_ms = Time.now.to_i
+    status = (now_ms - last_ping_ms.to_i) < 6 * 60 * 1000
+    if status
+      status 200
+    else
+      status 500
+    end
+  end
 end
