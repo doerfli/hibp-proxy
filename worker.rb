@@ -34,8 +34,9 @@ end
 
 Sidekiq.configure_server do |config|
   config.error_handlers << proc { |ex, _ctx_hash|
-    puts "caught exception (#{ex.class}) ... reconfiguring db connection"
+    puts "caught exception (#{ex.class})"
     if ex.is_a? Redis::CannotConnectError
+      puts "reconfiguring db connection"
       Sidekiq.configure_server do |config|
         new_redis_url = get_redis_url(ENV['HIBP_PROXY_BASE_URL'])
         config.redis = { url: new_redis_url }
