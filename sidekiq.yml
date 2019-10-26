@@ -1,7 +1,0 @@
-:verbose: true
-#:pidfile: /var/run/sidekiq.pid
-#:logfile: /var/log/sidekiq.log
-:concurrency: 1
-:queues:
-    - default
-:max_retries: 5
