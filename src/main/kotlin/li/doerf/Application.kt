@@ -1,5 +1,6 @@
 package li.doerf
 
+import com.codahale.metrics.Slf4jReporter
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
@@ -8,6 +9,7 @@ import io.ktor.features.StatusPages
 import io.ktor.gson.gson
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.metrics.dropwizard.DropwizardMetrics
 import io.ktor.response.respond
 import io.ktor.response.respondText
 import io.ktor.routing.get
@@ -16,9 +18,12 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
+import li.doerf.ProxyRequest
+import li.doerf.createBgWorker
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 val logger: Logger = LoggerFactory.getLogger(Application::class.java)
 
@@ -39,6 +44,14 @@ fun main(args: Array<String>): Unit {
                     logger.warn("caught IllegalArgumentException", cause)
                     call.respond(HttpStatusCode.BadRequest)
                 }
+            }
+            install(DropwizardMetrics) {
+                Slf4jReporter.forRegistry(registry)
+                    .outputTo(logger)
+                    .convertRatesTo(TimeUnit.MINUTES)
+                    .convertDurationsTo(TimeUnit.MILLISECONDS)
+                    .build()
+                    .start(5, TimeUnit.MINUTES)
             }
         }
 
