@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-val logger: Logger = LoggerFactory.getLogger(Application::class.java)
+private val logger: Logger = LoggerFactory.getLogger(Application::class.java)
 
 fun main(args: Array<String>): Unit {
     lateinit var bgworker: SendChannel<ProxyRequest>
