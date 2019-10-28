@@ -28,6 +28,10 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 private val logger: Logger = LoggerFactory.getLogger(Application::class.java)
+val dotenv = dotenv{
+    ignoreIfMalformed = true
+    ignoreIfMissing = true
+}
 
 fun main() {
     lateinit var bgworker: SendChannel<ProxyRequest>
@@ -35,7 +39,7 @@ fun main() {
         bgworker = createBgWorker()
     }
 
-    val port = dotenv().get("PORT", "8080").toInt()
+    val port = dotenv.get("PORT", "8080").toInt()
     logger.info("starting server on port $port")
     val server = embeddedServer(Netty, port) {
         install(ContentNegotiation) {

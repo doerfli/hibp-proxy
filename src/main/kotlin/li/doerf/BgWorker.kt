@@ -7,7 +7,6 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
-import io.github.cdimascio.dotenv.dotenv
 import io.ktor.application.Application
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineScope
@@ -25,8 +24,8 @@ import java.util.*
 
 
 private const val requestInterval = 1500L
-private val apiKey = dotenv().get("HIBP_API_KEY", "xxxxx")
-private val firebaseCredentials =  Base64.getDecoder().decode(dotenv()["FIREBASE_CREDENTIALS"])
+private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
+private val firebaseCredentials =  Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
 private var nextRequestAfter = Instant.now()
 
 private val logger: Logger = LoggerFactory.getLogger(Application::class.java)
