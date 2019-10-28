@@ -41,8 +41,8 @@ fun initializeFirebaseApp() {
 
 fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity = 100) {
     logger.info("BgWorker starting")
-//    logger.trace("hibp api key: $apiKey")
-//    logger.trace(String(firebaseCredentials))
+    logger.trace("hibp api key: $apiKey")
+    logger.trace(String(firebaseCredentials))
     initializeFirebaseApp()
 
     for (x in channel) {
