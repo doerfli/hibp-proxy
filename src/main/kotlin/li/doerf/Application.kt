@@ -1,6 +1,7 @@
 package li.doerf
 
 import com.codahale.metrics.Slf4jReporter
+import io.github.cdimascio.dotenv.dotenv
 import io.ktor.application.Application
 import io.ktor.application.call
 import io.ktor.application.install
@@ -16,10 +17,11 @@ import io.ktor.routing.get
 import io.ktor.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.SendChannel
-import li.doerf.ProxyRequest
-import li.doerf.createBgWorker
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.*
@@ -27,14 +29,15 @@ import java.util.concurrent.TimeUnit
 
 private val logger: Logger = LoggerFactory.getLogger(Application::class.java)
 
-fun main(args: Array<String>): Unit {
+fun main() {
     lateinit var bgworker: SendChannel<ProxyRequest>
     GlobalScope.launch {
         bgworker = createBgWorker()
     }
 
-    // TODO get port via env var (heroku)
-    val server = embeddedServer(Netty, 8080) {
+    val port = dotenv().get("PORT", "8080").toInt()
+    logger.info("starting server on port $port")
+    val server = embeddedServer(Netty, port) {
         install(ContentNegotiation) {
             gson {
             }
