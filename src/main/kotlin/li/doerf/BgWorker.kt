@@ -53,7 +53,7 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
             try {
                 delayIfRequired()
                 val (pwned, hibpResponse) = isPwned(x.account)
-                logger.trace("account (${x.account}) pwned? ${pwned}")
+                logger.trace("account (${x.account}) pwned? $pwned")
                 notifyDevice(x.device_token, x.account, hibpResponse)
             } catch (e: TooManyRequestsException) {
                 retry = true
