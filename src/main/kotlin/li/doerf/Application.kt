@@ -66,9 +66,9 @@ fun main(args: Array<String>): Unit {
                 call.respondText("enqueued request for $deviceToken", contentType = ContentType.Text.Plain)
             }
 
-//            get("/json/gson") {
-//                call.respond(mapOf("hello" to "world"))
-//            }
+            get("/monitor") {
+                call.respond(mapOf("hello" to "world"))
+            }
         }
     }
     server.start(wait = true)
