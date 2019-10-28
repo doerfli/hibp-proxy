@@ -50,3 +50,7 @@ compileTestKotlin {
         jvmTarget = "12"
     }
 }
+
+task stage {
+    dependsOn installDist
+}
