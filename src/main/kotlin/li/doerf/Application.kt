@@ -57,7 +57,7 @@ fun main(args: Array<String>): Unit {
 
         routing {
             get("/search") {
-                logger.debug("received search request")
+                logger.info("received search request")
                 val account = call.request.queryParameters["account"] ?: throw IllegalArgumentException("account empty")
                 val deviceToken = call.request.queryParameters["device_token"] ?: throw IllegalArgumentException("device_token empty")
 
