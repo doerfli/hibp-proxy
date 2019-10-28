@@ -74,6 +74,7 @@ fun main() {
             }
 
             get("/monitor") {
+                logger.info("received monitor request")
                 call.respond(mapOf("hello" to "world"))
             }
         }
