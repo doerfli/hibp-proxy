@@ -46,7 +46,6 @@ fun main() {
             gson {
             }
             install(StatusPages) {
-                // catch NumberFormatException and send back HTTP code 400
                 exception<IllegalArgumentException> { cause ->
                     logger.warn("caught IllegalArgumentException", cause)
                     call.respond(HttpStatusCode.BadRequest)
