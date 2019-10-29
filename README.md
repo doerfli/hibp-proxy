@@ -1,4 +1,4 @@
-https://github.com/doerfli/hibp-proxy/workflows/CI/badge.svg
+![](https://github.com/doerfli/hibp-proxy/workflows/CI/badge.svg)
 
 # HIBP API Proxy
 
