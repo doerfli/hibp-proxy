@@ -1,2 +1,8 @@
+/.gradle
+/.idea
+/out
+/build
+*.iml
+*.ipr
+*.iws
 .env
-service-account-file.json
