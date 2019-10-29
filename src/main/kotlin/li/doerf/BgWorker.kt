@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
+import java.io.IOException
 import java.net.URLEncoder
 import java.nio.charset.Charset
 import java.time.Instant
@@ -47,18 +48,26 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
     for (x in channel) {
         logger.info("proxy request received ${x.reqId}")
         logger.trace("$x")
+        var retry = 3
         do {
-            var retry = false
             try {
                 delayIfRequired()
                 val (pwned, hibpResponse) = isPwned(x.account)
                 logger.trace("account (${x.account}) pwned? $pwned")
                 notifyDevice(x.device_token, x.account, hibpResponse)
+                retry = 0  // finished
             } catch (e: TooManyRequestsException) {
-                retry = true
                 logger.warn("retry after $nextRequestAfter")
+            } catch (e: IOException) {
+                retry--
+                nextRequestAfter = nextRequestAfter.plus(5, ChronoUnit.SECONDS)
+                logger.warn("caught IOException, retrying in 5 seconds", e)
+            } catch (e: Exception) {
+                retry--
+                logger.error("unexpected exception", e)
             }
-        } while (retry)
+        } while (retry > 0)
+        logger.trace("request finished ${x.reqId}")
     }
     logger.info("BgWorker exiting")
 }
