@@ -1,5 +1,3 @@
-![](https://github.com/doerfli/hibp-proxy/workflows/CI/badge.svg)
-
 # HIBP API Proxy
 
 This is a proxy for the haveibeenpwned.com API V3 function _Getting all breaches for an account_ (https://haveibeenpwned.com/API/v3#BreachesForAccount).
