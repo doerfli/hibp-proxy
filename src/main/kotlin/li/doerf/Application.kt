@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -32,6 +34,8 @@ val dotenv = dotenv{
     ignoreIfMalformed = true
     ignoreIfMissing = true
 }
+// time the last ping request was received by the bgworker
+var lastPing: Instant = Instant.now()
 
 fun main() {
     lateinit var bgworker: SendChannel<ProxyRequest>
@@ -74,7 +78,13 @@ fun main() {
 
             get("/monitor") {
                 logger.info("received monitor request")
-                call.respond(mapOf("hello" to "world"))
+                dispatchProxyRequest("dummy", "dummy", bgworker, true)
+                val status = if (lastPing.isBefore(Instant.now().minus(10, ChronoUnit.MINUTES))) {
+                        HttpStatusCode.InternalServerError
+                    } else {
+                        HttpStatusCode.OK
+                    }
+                call.respond(status, mapOf("lastPing" to lastPing))
             }
         }
     }
@@ -84,13 +94,14 @@ fun main() {
 private suspend fun dispatchProxyRequest(
     account: String,
     deviceToken: String,
-    bgworker: SendChannel<ProxyRequest>
+    bgworker: SendChannel<ProxyRequest>,
+    ping: Boolean = false
 ) {
     withContext(Dispatchers.Default) {
-        val r = ProxyRequest(UUID.randomUUID(), account, deviceToken)
-        logger.debug("sending proxy request ${r.reqId}")
+        val r = ProxyRequest(UUID.randomUUID(), account, deviceToken, ping)
+        logger.debug("sending proxy request ${r.requestId}")
         bgworker.send(r)
-        logger.trace("request ${r.reqId} sent")
+        logger.trace("request ${r.requestId} sent")
     }
 }
 

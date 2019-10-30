@@ -27,9 +27,8 @@ import java.util.*
 private const val requestInterval = 1500L
 private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
 private val firebaseCredentials =  Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
-private var nextRequestAfter = Instant.now()
-
 private val logger: Logger = LoggerFactory.getLogger(Application::class.java)
+private var nextRequestAfter = Instant.now()
 
 
 fun initializeFirebaseApp() {
@@ -45,16 +44,14 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
     logger.trace(String(firebaseCredentials))
     initializeFirebaseApp()
 
-    for (x in channel) {
-        logger.info("proxy request received ${x.reqId}")
-        logger.trace("$x")
+    for (msg in channel) {
+        logger.info("proxy request received ${msg.requestId}")
+        logger.trace("$msg")
+        if (isPing(msg)) continue  // handle ping request and continue
         var retry = 3
         do {
             try {
-                delayIfRequired()
-                val (pwned, hibpResponse) = isPwned(x.account)
-                logger.trace("account (${x.account}) pwned? $pwned")
-                notifyDevice(x.device_token, x.account, hibpResponse)
+                processProxyRequest(msg)
                 retry = 0  // finished
             } catch (e: TooManyRequestsException) {
                 logger.warn("retry after $nextRequestAfter")
@@ -67,9 +64,25 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
                 logger.error("unexpected exception", e)
             }
         } while (retry > 0)
-        logger.trace("request finished ${x.reqId}")
+        logger.trace("request finished ${msg.requestId}")
     }
     logger.info("BgWorker exiting")
+}
+
+private suspend fun processProxyRequest(request: ProxyRequest) {
+    delayIfRequired()
+    val (pwned, hibpResponse) = isPwned(request.account)
+    logger.trace("account (${request.account}) pwned? $pwned")
+    notifyDevice(request.deviceToken, request.account, hibpResponse)
+}
+
+private fun isPing(x: ProxyRequest): Boolean {
+    if (x.ping) {
+        lastPing = Instant.now()
+        logger.info("processed ping request")
+        return true
+    }
+    return false
 }
 
 suspend fun delayIfRequired() {
