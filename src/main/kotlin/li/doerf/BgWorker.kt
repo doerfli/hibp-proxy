@@ -52,8 +52,8 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
             doProxyRequestWithRetries(msg)
         } finally {
             val accountDevice = "${msg.account}_${msg.deviceToken}"
-            bgWorkerQueueSet.remove(accountDevice)
-            logger.trace("request finished ${msg.requestId}")
+            bgWorkerQueue.remove(accountDevice)
+            logger.info("request finished ${msg.requestId} (remaining queue size: ${bgWorkerQueue.size})")
         }
     }
     logger.info("BgWorker exiting")
