@@ -47,26 +47,35 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
     for (msg in channel) {
         logger.info("proxy request received ${msg.requestId}")
         logger.trace("$msg")
-        if (isPing(msg)) continue  // handle ping request and continue
-        var retry = 3
-        do {
-            try {
-                processProxyRequest(msg)
-                retry = 0  // finished
-            } catch (e: TooManyRequestsException) {
-                logger.warn("retry after $nextRequestAfter")
-            } catch (e: IOException) {
-                retry--
-                nextRequestAfter = nextRequestAfter.plus(5, ChronoUnit.SECONDS)
-                logger.warn("caught IOException, retrying in 5 seconds", e)
-            } catch (e: Exception) {
-                retry--
-                logger.error("unexpected exception", e)
-            }
-        } while (retry > 0)
-        logger.trace("request finished ${msg.requestId}")
+        try {
+            if (isPing(msg)) continue  // handle ping request and continue
+            doProxyRequestWithRetries(msg)
+        } finally {
+            val accountDevice = "${msg.account}_${msg.deviceToken}"
+            bgWorkerQueueSet.remove(accountDevice)
+            logger.trace("request finished ${msg.requestId}")
+        }
     }
     logger.info("BgWorker exiting")
+}
+
+private suspend fun doProxyRequestWithRetries(msg: ProxyRequest) {
+    var retry = 3
+    do {
+        try {
+            processProxyRequest(msg)
+            retry = 0  // finished
+        } catch (e: TooManyRequestsException) {
+            logger.warn("retry after $nextRequestAfter")
+        } catch (e: IOException) {
+            retry--
+            nextRequestAfter = nextRequestAfter.plus(5, ChronoUnit.SECONDS)
+            logger.warn("caught IOException, retrying in 5 seconds", e)
+        } catch (e: Exception) {
+            retry--
+            logger.error("unexpected exception", e)
+        }
+    } while (retry > 0)
 }
 
 private suspend fun processProxyRequest(request: ProxyRequest) {

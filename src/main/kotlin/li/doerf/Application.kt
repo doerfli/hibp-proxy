@@ -34,6 +34,8 @@ val dotenv = dotenv{
     ignoreIfMalformed = true
     ignoreIfMissing = true
 }
+// the set that contains all active (pending) account_deviceid combinations
+val bgWorkerQueueSet = Collections.synchronizedSet(mutableSetOf<String>())
 // time the last ping request was received by the bgworker
 var lastPing: Instant = Instant.now()
 
@@ -97,9 +99,12 @@ private suspend fun dispatchProxyRequest(
     bgworker: SendChannel<ProxyRequest>,
     ping: Boolean = false
 ) {
+    val accountDevice = "${account}_$deviceToken"
+    if (bgWorkerQueueSet.contains(accountDevice)) { return } // already queued
     withContext(Dispatchers.Default) {
         val r = ProxyRequest(UUID.randomUUID(), account, deviceToken, ping)
         logger.debug("sending proxy request ${r.requestId}")
+        bgWorkerQueueSet.add(accountDevice)
         bgworker.send(r)
         logger.trace("request ${r.requestId} sent")
     }
