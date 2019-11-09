@@ -5,11 +5,13 @@ buildscript {
     
     dependencies {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
+        classpath("com.github.ben-manes:gradle-versions-plugin:$benManesVersion")
     }
 }
 
 apply plugin: 'kotlin'
 apply plugin: 'application'
+apply plugin: "com.github.ben-manes.versions"
 
 group 'li.doerf'
 version '0.0.1'
