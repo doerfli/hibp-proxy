@@ -14,7 +14,6 @@ apply plugin: 'application'
 group 'li.doerf'
 version '0.0.1'
 mainClassName = "li.doerf.ApplicationKt"
-java.sourceCompatibility = JavaVersion.VERSION_12
 
 repositories {
     mavenLocal()
