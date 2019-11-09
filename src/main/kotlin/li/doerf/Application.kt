@@ -93,7 +93,7 @@ fun main() {
     server.start(wait = true)
 }
 
-private suspend fun dispatchProxyRequest(
+internal suspend fun dispatchProxyRequest(
     account: String,
     deviceToken: String,
     bgworker: SendChannel<ProxyRequest>,
