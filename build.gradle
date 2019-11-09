@@ -57,3 +57,10 @@ compileTestKotlin {
 task stage {
     dependsOn installDist
 }
+
+tasks.test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+    }
+}
