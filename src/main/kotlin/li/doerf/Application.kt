@@ -42,7 +42,7 @@ var lastPing: Instant = Instant.now()
 fun main() {
     lateinit var bgworker: SendChannel<ProxyRequest>
     GlobalScope.launch {
-        bgworker = createBgWorker()
+        bgworker = createBgWorker { lastPing = Instant.now() }
     }
 
     val port = dotenv.get("PORT", "8080").toInt()

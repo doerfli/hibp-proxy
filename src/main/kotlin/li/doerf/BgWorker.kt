@@ -38,7 +38,7 @@ fun initializeFirebaseApp() {
     FirebaseApp.initializeApp(options)
 }
 
-fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity = 100) {
+fun CoroutineScope.createBgWorker(lastPingUpdate: () -> Unit): SendChannel<ProxyRequest> = actor(capacity = 100) {
     logger.info("BgWorker starting")
     logger.trace("hibp api key: $apiKey")
     logger.trace(String(firebaseCredentials))
@@ -48,7 +48,7 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
         logger.info("proxy request received ${msg.requestId}")
         logger.trace("$msg")
         try {
-            if (isPing(msg)) continue  // handle ping request and continue
+            if (isPing(msg, lastPingUpdate)) continue  // handle ping request and continue
             doProxyRequestWithRetries(msg)
         } finally {
             val accountDevice = "${msg.account}_${msg.deviceToken}"
@@ -85,9 +85,9 @@ private suspend fun processProxyRequest(request: ProxyRequest) {
     notifyDevice(request.deviceToken, request.account, hibpResponse)
 }
 
-private fun isPing(x: ProxyRequest): Boolean {
+private fun isPing(x: ProxyRequest, lastPingUpdate: () -> Unit): Boolean {
     if (x.ping) {
-        lastPing = Instant.now()
+        lastPingUpdate.invoke()
         logger.info("processed ping request")
         return true
     }
