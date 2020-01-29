@@ -14,6 +14,7 @@ import io.ktor.metrics.dropwizard.DropwizardMetrics
 import io.ktor.response.respond
 import io.ktor.response.respondText
 import io.ktor.routing.get
+import io.ktor.routing.post
 import io.ktor.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -37,12 +38,12 @@ val dotenv = dotenv{
 // the set that contains all active (pending) account_deviceid combinations
 val bgWorkerQueue = Collections.synchronizedSet(mutableSetOf<String>())
 // time the last ping request was received by the bgworker
-var lastPing: Instant = Instant.now()
+var lastPing: Instant = Instant.MIN
 
 fun main() {
     lateinit var bgworker: SendChannel<ProxyRequest>
     GlobalScope.launch {
-        bgworker = createBgWorker { lastPing = Instant.now() }
+        bgworker = createBgWorker()
     }
 
     val port = dotenv.get("PORT", "8080").toInt()
@@ -73,20 +74,26 @@ fun main() {
                 val account = call.request.queryParameters["account"] ?: throw IllegalArgumentException("account empty")
                 val deviceToken = call.request.queryParameters["device_token"] ?: throw IllegalArgumentException("device_token empty")
 
-                dispatchProxyRequest(account, deviceToken, bgworker)
+                dispatchProxyRequest(account, deviceToken, bgworker, port = port)
 
                 call.respondText("enqueued request for $deviceToken", contentType = ContentType.Text.Plain)
             }
 
             get("/monitor") {
                 logger.info("received monitor request")
-                dispatchProxyRequest("dummy", "dummy", bgworker, true)
+                dispatchProxyRequest("dummy", "dummy", bgworker, true, port)
                 val status = if (lastPing.isBefore(Instant.now().minus(10, ChronoUnit.MINUTES))) {
                         HttpStatusCode.InternalServerError
                     } else {
                         HttpStatusCode.OK
                     }
                 call.respond(status, mapOf("lastPing" to lastPing))
+            }
+
+            post("/ping") {
+                logger.info("ping request")
+                lastPing = Instant.now()
+                call.respond(HttpStatusCode.OK, mapOf("lastPing" to lastPing))
             }
         }
     }
@@ -97,7 +104,8 @@ internal suspend fun dispatchProxyRequest(
     account: String,
     deviceToken: String,
     bgworker: SendChannel<ProxyRequest>,
-    ping: Boolean = false
+    ping: Boolean = false,
+    port: Int = 8080
 ) {
     val accountDevice = "${account}_$deviceToken"
     if (bgWorkerQueue.contains(accountDevice)) {  // already queued
@@ -105,7 +113,7 @@ internal suspend fun dispatchProxyRequest(
         return
     }
     withContext(Dispatchers.Default) {
-        val r = ProxyRequest(UUID.randomUUID(), account, deviceToken, ping)
+        val r = ProxyRequest(UUID.randomUUID(), account, deviceToken, ping, port)
         logger.debug("sending proxy request ${r.requestId}")
         bgworker.send(r)
         bgWorkerQueue.add(accountDevice)

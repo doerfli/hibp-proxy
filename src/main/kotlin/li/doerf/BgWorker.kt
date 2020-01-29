@@ -1,7 +1,9 @@
 package li.doerf
 
+import com.github.kittinunf.fuel.coroutines.awaitStringResponse
 import com.github.kittinunf.fuel.coroutines.awaitStringResponseResult
 import com.github.kittinunf.fuel.httpGet
+import com.github.kittinunf.fuel.httpPost
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
@@ -38,7 +40,7 @@ fun initializeFirebaseApp() {
     FirebaseApp.initializeApp(options)
 }
 
-fun CoroutineScope.createBgWorker(lastPingUpdate: () -> Unit): SendChannel<ProxyRequest> = actor(capacity = 100) {
+fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity = 100) {
     logger.info("BgWorker starting")
     logger.trace("hibp api key: $apiKey")
     logger.trace(String(firebaseCredentials))
@@ -48,7 +50,7 @@ fun CoroutineScope.createBgWorker(lastPingUpdate: () -> Unit): SendChannel<Proxy
         logger.info("proxy request received ${msg.requestId}")
         logger.trace("$msg")
         try {
-            if (isPing(msg, lastPingUpdate)) continue  // handle ping request and continue
+            if (isPing(msg)) continue  // handle ping request and continue
             doProxyRequestWithRetries(msg)
         } finally {
             val accountDevice = "${msg.account}_${msg.deviceToken}"
@@ -85,10 +87,10 @@ private suspend fun processProxyRequest(request: ProxyRequest) {
     notifyDevice(request.deviceToken, request.account, hibpResponse)
 }
 
-private fun isPing(x: ProxyRequest, lastPingUpdate: () -> Unit): Boolean {
+private suspend fun isPing(x: ProxyRequest): Boolean {
     if (x.ping) {
-        lastPingUpdate.invoke()
-        logger.info("processed ping request")
+        val (_, response, _) = "http://localhost:${x.port}/ping".httpPost().awaitStringResponse()
+        logger.info("processed ping request. response status code: ${response.statusCode}")
         return true
     }
     return false
