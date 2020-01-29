@@ -10,6 +10,7 @@ import io.ktor.features.StatusPages
 import io.ktor.gson.gson
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.toHttpDateString
 import io.ktor.metrics.dropwizard.DropwizardMetrics
 import io.ktor.response.respond
 import io.ktor.response.respondText
@@ -18,11 +19,8 @@ import io.ktor.routing.post
 import io.ktor.routing.routing
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.Instant
@@ -70,7 +68,7 @@ fun main() {
 
         routing {
             get("/search") {
-                logger.info("received search request")
+                logger.info("/search received request")
                 val account = call.request.queryParameters["account"] ?: throw IllegalArgumentException("account empty")
                 val deviceToken = call.request.queryParameters["device_token"] ?: throw IllegalArgumentException("device_token empty")
 
@@ -80,19 +78,26 @@ fun main() {
             }
 
             get("/monitor") {
-                logger.info("received monitor request")
+                logger.info("/monitor received request")
                 dispatchProxyRequest("dummy", "dummy", bgworker, true, port)
-                val status = if (lastPing.isBefore(Instant.now().minus(10, ChronoUnit.MINUTES))) {
+                delay(20) // wait for background request to go through (at least in most cases)
+                val tenMinutesAgo = Instant.now().minus(10, ChronoUnit.MINUTES)
+                logger.debug("/monitor lastPing:      ${lastPing.toEpochMilli()} (${lastPing.toHttpDateString()})")
+                logger.debug("/monitor tenMinutesAgo: ${tenMinutesAgo.toEpochMilli()} (${tenMinutesAgo.toHttpDateString()})")
+                val status = if (lastPing.isBefore(tenMinutesAgo)) {
+                        logger.debug("/monitor HttpStatusCode.InternalServerError")
                         HttpStatusCode.InternalServerError
                     } else {
+                    logger.debug("/monitor HttpStatusCode.OK")
                         HttpStatusCode.OK
                     }
                 call.respond(status, mapOf("lastPing" to lastPing))
             }
 
             post("/ping") {
-                logger.info("ping request")
+                logger.info("/ping received request")
                 lastPing = Instant.now()
+                logger.debug("/ping lastPing: ${lastPing.toEpochMilli()} (${lastPing.toHttpDateString()})")
                 call.respond(HttpStatusCode.OK, mapOf("lastPing" to lastPing))
             }
         }
