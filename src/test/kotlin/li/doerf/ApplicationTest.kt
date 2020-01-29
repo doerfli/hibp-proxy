@@ -29,7 +29,7 @@ class ApplicationTest {
         assertTrue(bgWorkerQueue.isEmpty())
 
         runBlocking {
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false, port)
+            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false, 8080)
 
             assertThat(bgWorkerQueue.size).isEqualTo(1)
             verify(bgWorkerMock).send(capture(captor))
@@ -53,11 +53,11 @@ class ApplicationTest {
         assertTrue(bgWorkerQueue.isEmpty())
 
         runBlocking {
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false, port)
+            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false, 8080)
 
             assertThat(bgWorkerQueue.size).isEqualTo(1)
 
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false, port)
+            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false, 8080)
             assertThat(bgWorkerQueue.size).isEqualTo(1)
         }
     }
@@ -73,7 +73,7 @@ class ApplicationTest {
         assertTrue(bgWorkerQueue.isEmpty())
 
         runBlocking {
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, true, port)
+            dispatchProxyRequest(account, deviceToken, bgWorkerMock, true, 8080)
 
             assertThat(bgWorkerQueue.size).isEqualTo(1)
             verify(bgWorkerMock).send(capture(captor))
