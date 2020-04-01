@@ -11,9 +11,10 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import io.ktor.application.Application
 import io.ktor.http.HttpStatusCode
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
+import kotlinx.coroutines.delay
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
@@ -23,6 +24,7 @@ import java.nio.charset.Charset
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 
 private const val requestInterval = 1500L
@@ -137,10 +139,7 @@ fun notifyDevice(deviceToken: String, account: String, response: String) {
         .setToken(deviceToken)
         .build()
 
-    GlobalScope.launch(SupervisorJob()) {
-        logger.debug("sending fcm response")
-        val fcmResponse = FirebaseMessaging.getInstance().send(message)
-        logger.info("sent fcm message: $fcmResponse")
-    }
-
+    logger.debug("sending fcm response")
+    val fcmResponse = FirebaseMessaging.getInstance().sendAsync(message)[10, TimeUnit.SECONDS]
+    logger.info("sent fcm message: $fcmResponse")
 }
