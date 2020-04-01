@@ -24,6 +24,7 @@ import java.nio.charset.Charset
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 
 private const val requestInterval = 1500L
@@ -139,6 +140,6 @@ fun notifyDevice(deviceToken: String, account: String, response: String) {
         .build()
 
     logger.debug("sending fcm response")
-    val fcmResponse = FirebaseMessaging.getInstance().send(message)
+    val fcmResponse = FirebaseMessaging.getInstance().sendAsync(message)[10, TimeUnit.SECONDS]
     logger.info("sent fcm message: $fcmResponse")
 }
