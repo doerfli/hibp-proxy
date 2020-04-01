@@ -11,10 +11,9 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import io.ktor.application.Application
 import io.ktor.http.HttpStatusCode
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
-import kotlinx.coroutines.delay
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
@@ -138,7 +137,10 @@ fun notifyDevice(deviceToken: String, account: String, response: String) {
         .setToken(deviceToken)
         .build()
 
-    logger.debug("sending fcm response")
-    val fcmResponse = FirebaseMessaging.getInstance().send(message)
-    logger.info("sent fcm message: $fcmResponse")
+    GlobalScope.launch(SupervisorJob()) {
+        logger.debug("sending fcm response")
+        val fcmResponse = FirebaseMessaging.getInstance().send(message)
+        logger.info("sent fcm message: $fcmResponse")
+    }
+
 }
