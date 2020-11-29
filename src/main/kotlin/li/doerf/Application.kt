@@ -64,7 +64,9 @@ fun main() {
 
         routing {
             get("/search") {
-                logger.info("/search received request")
+                val userAgent = call.request.headers["user-agent"]
+                logger.info("/search received request (UserAgent: $userAgent)")
+
                 val account = call.request.queryParameters["account"] ?: throw IllegalArgumentException("account empty")
                 val deviceToken = call.request.queryParameters["device_token"] ?: throw IllegalArgumentException("device_token empty")
                 val timestamp = call.request.headers["x-hacked-now"]
