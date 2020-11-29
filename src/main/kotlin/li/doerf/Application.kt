@@ -2,25 +2,21 @@ package li.doerf
 
 import com.codahale.metrics.Slf4jReporter
 import io.github.cdimascio.dotenv.dotenv
-import io.ktor.application.Application
-import io.ktor.application.call
-import io.ktor.application.install
-import io.ktor.features.ContentNegotiation
-import io.ktor.features.StatusPages
-import io.ktor.gson.gson
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.toHttpDateString
-import io.ktor.metrics.dropwizard.DropwizardMetrics
-import io.ktor.response.respond
-import io.ktor.response.respondText
+import io.ktor.application.*
+import io.ktor.features.*
+import io.ktor.gson.*
+import io.ktor.http.*
+import io.ktor.metrics.dropwizard.*
+import io.ktor.response.*
 import io.ktor.routing.get
 import io.ktor.routing.post
 import io.ktor.routing.routing
-import io.ktor.server.engine.embeddedServer
-import io.ktor.server.netty.Netty
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
+import org.apache.commons.codec.binary.Hex
+import org.apache.commons.codec.digest.DigestUtils
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.Instant
@@ -71,8 +67,12 @@ fun main() {
                 logger.info("/search received request")
                 val account = call.request.queryParameters["account"] ?: throw IllegalArgumentException("account empty")
                 val deviceToken = call.request.queryParameters["device_token"] ?: throw IllegalArgumentException("device_token empty")
+                val timestamp = call.request.headers["x-hacked-now"]
+                val reqToken = call.request.headers["x-hacked-requestToken"]
 
-                dispatchProxyRequest(account, deviceToken, bgworker, port = port)
+                if (tokenValid(reqToken, account, timestamp, deviceToken)) {
+                    dispatchProxyRequest(account, deviceToken, bgworker, port = port)
+                }
 
                 call.respondText("enqueued request for $deviceToken", contentType = ContentType.Text.Plain)
             }
@@ -103,6 +103,21 @@ fun main() {
         }
     }
     server.start(wait = true)
+}
+
+fun tokenValid(reqToken: String?, account: String, timestamp: String?, deviceToken: String): Boolean {
+
+    if (reqToken != null) {
+        val expectedToken =
+            String(Hex.encodeHex(DigestUtils.sha1("$account-$timestamp-$deviceToken}"))).toUpperCase(Locale.getDefault())
+        val valid = reqToken == expectedToken
+        logger.trace("account: $account, timestamp: $timestamp, deviceToken: $deviceToken")
+        logger.debug("token valid: $valid - received '$reqToken' / expected '$expectedToken'")
+    } else {
+        logger.trace("no request token received")
+    }
+
+    return true
 }
 
 internal suspend fun dispatchProxyRequest(
