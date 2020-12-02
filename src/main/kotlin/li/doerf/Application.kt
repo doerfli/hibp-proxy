@@ -116,7 +116,7 @@ fun tokenValid(reqToken: String?, account: String, timestamp: String?, deviceTok
         logger.trace("account: $account, timestamp: $timestamp, deviceToken: $deviceToken")
         logger.debug("token valid: $valid - received '$reqToken' / expected '$expectedToken'")
     } else {
-        logger.trace("no request token received")
+        logger.debug("no request token received")
     }
 
     return true
