@@ -24,7 +24,7 @@ import java.time.temporal.ChronoUnit
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-private val logger: Logger = LoggerFactory.getLogger(Application::class.java)
+private val logger: Logger = LoggerFactory.getLogger("Application")
 val dotenv = dotenv{
     ignoreIfMalformed = true
     ignoreIfMissing = true

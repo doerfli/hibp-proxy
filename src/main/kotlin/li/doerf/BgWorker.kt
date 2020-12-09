@@ -9,8 +9,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
-import io.ktor.application.Application
-import io.ktor.http.HttpStatusCode
+import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
@@ -30,7 +29,7 @@ import java.util.concurrent.TimeUnit
 private const val requestInterval = 1500L
 private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
 private val firebaseCredentials =  Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
-private val logger: Logger = LoggerFactory.getLogger(Application::class.java)
+private val logger: Logger = LoggerFactory.getLogger("BgWorker")
 private var nextRequestAfter = Instant.now()
 
 
@@ -41,7 +40,7 @@ fun initializeFirebaseApp() {
     FirebaseApp.initializeApp(options)
 }
 
-fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity = 100) {
+fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity = 500) {
     logger.info("BgWorker starting")
     logger.trace("hibp api key: $apiKey")
     logger.trace(String(firebaseCredentials))
