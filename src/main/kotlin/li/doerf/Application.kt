@@ -108,18 +108,23 @@ fun main() {
 }
 
 fun tokenValid(reqToken: String?, account: String, timestamp: String?, deviceToken: String): Boolean {
+    if (dotenv.get("NO_TOKEN_REQUIRED", "false").toBoolean()) {
+        return true
+    }
+
+    var valid = false
 
     if (reqToken != null) {
         val expectedToken =
             String(Hex.encodeHex(DigestUtils.sha1("$account-$timestamp-$deviceToken}"))).toUpperCase(Locale.getDefault())
-        val valid = reqToken == expectedToken
+        valid = reqToken == expectedToken
         logger.trace("account: $account, timestamp: $timestamp, deviceToken: $deviceToken")
         logger.debug("token valid: $valid - received '$reqToken' / expected '$expectedToken'")
     } else {
         logger.debug("no request token received")
     }
 
-    return true
+    return valid
 }
 
 internal suspend fun dispatchProxyRequest(
