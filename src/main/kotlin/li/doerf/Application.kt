@@ -63,6 +63,9 @@ fun main() {
         }
 
         routing {
+            get("/") {
+                call.respondText("nothing to see here. please go away", contentType = ContentType.Text.Plain)
+            }
             get("/search") {
                 val userAgent = call.request.headers["user-agent"]
                 logger.info("/search received request (UserAgent: $userAgent)")
