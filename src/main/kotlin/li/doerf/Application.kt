@@ -51,6 +51,10 @@ fun main() {
                     logger.warn("caught IllegalArgumentException", cause)
                     call.respond(HttpStatusCode.BadRequest)
                 }
+                exception<Exception> { cause ->
+                    logger.error("caught Exception", cause)
+                    call.respond(HttpStatusCode.InternalServerError)
+                }
             }
             install(DropwizardMetrics) {
                 Slf4jReporter.forRegistry(registry)
