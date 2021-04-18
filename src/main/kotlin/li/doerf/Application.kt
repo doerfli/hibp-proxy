@@ -51,8 +51,8 @@ fun main() {
                     logger.warn("caught IllegalArgumentException", cause)
                     call.respond(HttpStatusCode.BadRequest)
                 }
-                exception<Exception> { cause ->
-                    logger.error("caught Exception", cause)
+                exception<Throwable> { cause ->
+                    logger.error("caught Throwable", cause)
                     call.respond(HttpStatusCode.InternalServerError)
                 }
             }
