@@ -20,8 +20,6 @@ mainClassName = "li.doerf.ApplicationKt"
 repositories {
     mavenLocal()
     mavenCentral()
-    jcenter()
-    maven { url 'https://kotlin.bintray.com/ktor' }
 }
 
 dependencies {
