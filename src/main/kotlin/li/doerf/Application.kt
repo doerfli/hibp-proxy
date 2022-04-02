@@ -91,8 +91,8 @@ fun main() {
                 dispatchProxyRequest("dummy", "dummy", bgworker, true, port)
                 delay(20) // wait for background request to go through (at least in most cases)
                 val tenMinutesAgo = Instant.now().minus(10, ChronoUnit.MINUTES)
-                logger.debug("/monitor lastPing:      ${lastPing.toEpochMilli()} (${lastPing.toHttpDateString()})")
-                logger.debug("/monitor tenMinutesAgo: ${tenMinutesAgo.toEpochMilli()} (${tenMinutesAgo.toHttpDateString()})")
+                logger.debug("/monitor lastPing:      ${lastPing.toHttpDateString()}")
+                logger.debug("/monitor tenMinutesAgo: ${tenMinutesAgo.toHttpDateString()}")
                 val status = if (lastPing.isBefore(tenMinutesAgo)) {
                         logger.debug("/monitor HttpStatusCode.InternalServerError")
                         HttpStatusCode.InternalServerError
@@ -106,7 +106,7 @@ fun main() {
             post("/ping") {
                 logger.info("/ping received request")
                 lastPing = Instant.now()
-                logger.debug("/ping lastPing: ${lastPing.toEpochMilli()} (${lastPing.toHttpDateString()})")
+                logger.debug("/ping lastPing: ${lastPing.toHttpDateString()}")
                 call.respond(HttpStatusCode.OK, mapOf("lastPing" to lastPing))
             }
         }
