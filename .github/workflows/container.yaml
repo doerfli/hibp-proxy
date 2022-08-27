@@ -1,0 +1,17 @@
+name: Build and deploy application
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v1
+      - uses: rlespinasse/github-slug-action@v2.x
+      - name: Login to registry
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u doerfli --password-stdin
+      - name: Build container
+        run: docker build -t ghcr.io/doerfli/hibp-proxy:${{ env.GITHUB_REF_SLUG }} .
+      - name: Publish container
+        run: docker push ghcr.io/doerfli/hibp-proxy:${{ env.GITHUB_REF_SLUG }}
