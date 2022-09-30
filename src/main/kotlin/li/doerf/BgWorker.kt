@@ -114,6 +114,7 @@ suspend fun isPwned(account: String): Pair<Boolean, String> {
         url.httpGet()
             .header("Hibp-Api-Key", apiKey)
             .header("UserAgent", "hibp-proxy_for_hacked_android_app")
+            .header("Hibp-Version", "1.0")
             .awaitStringResponseResult()
     nextRequestAfter = Instant.now().plusMillis(requestInterval)
     logger.info("response status code: ${response.statusCode}")
