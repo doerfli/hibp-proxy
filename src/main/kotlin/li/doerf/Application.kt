@@ -100,14 +100,14 @@ fun main() {
                     logger.debug("/monitor HttpStatusCode.OK")
                         HttpStatusCode.OK
                     }
-                call.respond(status, mapOf("lastPing" to lastPing))
+                call.respond(status, mapOf("lastPing" to lastPing.getEpochSecond()))
             }
 
             post("/ping") {
                 logger.info("/ping received request")
                 lastPing = Instant.now()
                 logger.debug("/ping lastPing: ${lastPing.toHttpDateString()}")
-                call.respond(HttpStatusCode.OK, mapOf("lastPing" to lastPing))
+                call.respond(HttpStatusCode.OK, mapOf("lastPing" to lastPing.getEpochSecond()))
             }
         }
     }
