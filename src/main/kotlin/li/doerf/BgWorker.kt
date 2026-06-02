@@ -50,7 +50,10 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity 
         logger.info("proxy request received ${msg.requestId}")
         logger.trace("$msg")
         try {
-            if (isPing(msg)) continue  // handle ping request and continue
+            if (isPing(msg)) {
+                bgWorkerQueue.remove("${msg.account}_${msg.deviceToken}")
+                continue  // handle ping request and continue
+            }
             doProxyRequestWithRetries(msg)
         } finally {
             val accountDevice = "${msg.account}_${msg.deviceToken}"

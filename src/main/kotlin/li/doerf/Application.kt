@@ -32,7 +32,7 @@ val dotenv = dotenv{
 // the set that contains all active (pending) account_deviceid combinations
 val bgWorkerQueue = Collections.synchronizedSet(mutableSetOf<String>())
 // time the last ping request was received by the bgworker
-var lastPing: Instant = Instant.MIN
+var lastPing: Instant = Instant.now()
 
 fun main() {
     lateinit var bgworker: SendChannel<ProxyRequest>
