@@ -2,7 +2,7 @@ FROM eclipse-temurin:21-alpine AS builder
 
 WORKDIR /build
 COPY . .
-RUN ./gradlew installDist
+RUN ./gradlew installDist --no-daemon
 
 
 # runtime image
