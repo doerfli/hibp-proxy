@@ -1,1 +1,0 @@
-web: build/install/hibp-proxy/bin/hibp-proxy
