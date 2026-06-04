@@ -2,17 +2,16 @@ package li.doerf
 
 import com.codahale.metrics.Slf4jReporter
 import io.github.cdimascio.dotenv.dotenv
-import io.ktor.application.*
-import io.ktor.features.*
-import io.ktor.gson.*
 import io.ktor.http.*
-import io.ktor.metrics.dropwizard.*
-import io.ktor.response.*
-import io.ktor.routing.get
-import io.ktor.routing.post
-import io.ktor.routing.routing
+import io.ktor.serialization.gson.*
+import io.ktor.server.application.*
 import io.ktor.server.engine.*
+import io.ktor.server.metrics.dropwizard.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.SendChannel
 import org.apache.commons.codec.binary.Hex
@@ -25,45 +24,40 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 private val logger: Logger = LoggerFactory.getLogger("Application")
-val dotenv = dotenv{
+val dotenv = dotenv {
     ignoreIfMalformed = true
     ignoreIfMissing = true
 }
-// the set that contains all active (pending) account_deviceid combinations
 val bgWorkerQueue = Collections.synchronizedSet(mutableSetOf<String>())
-// time the last ping request was received by the bgworker
 var lastPing: Instant = Instant.now()
 
 fun main() {
-    lateinit var bgworker: SendChannel<ProxyRequest>
-    GlobalScope.launch {
-        bgworker = createBgWorker()
-    }
+    val appScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    val bgworker = appScope.createBgWorker()
 
     val port = dotenv.get("PORT", "8080").toInt()
     logger.info("starting server on port $port")
     val server = embeddedServer(Netty, port) {
         install(ContentNegotiation) {
-            gson {
+            gson()
+        }
+        install(StatusPages) {
+            exception<IllegalArgumentException> { call, cause ->
+                logger.warn("caught IllegalArgumentException", cause)
+                call.respond(HttpStatusCode.BadRequest)
             }
-            install(StatusPages) {
-                exception<IllegalArgumentException> { cause ->
-                    logger.warn("caught IllegalArgumentException", cause)
-                    call.respond(HttpStatusCode.BadRequest)
-                }
-                exception<Throwable> { cause ->
-                    logger.error("caught Throwable", cause)
-                    call.respond(HttpStatusCode.InternalServerError)
-                }
+            exception<Throwable> { call, cause ->
+                logger.error("caught Throwable", cause)
+                call.respond(HttpStatusCode.InternalServerError)
             }
-            install(DropwizardMetrics) {
-                Slf4jReporter.forRegistry(registry)
-                    .outputTo(logger)
-                    .convertRatesTo(TimeUnit.MINUTES)
-                    .convertDurationsTo(TimeUnit.MILLISECONDS)
-                    .build()
-                    .start(5, TimeUnit.MINUTES)
-            }
+        }
+        install(DropwizardMetrics) {
+            Slf4jReporter.forRegistry(registry)
+                .outputTo(logger)
+                .convertRatesTo(TimeUnit.MINUTES)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build()
+                .start(5, TimeUnit.MINUTES)
         }
 
         routing {
@@ -89,25 +83,25 @@ fun main() {
             get("/monitor") {
                 logger.info("/monitor received request")
                 dispatchProxyRequest("dummy", "dummy", bgworker, true, port)
-                delay(20) // wait for background request to go through (at least in most cases)
+                delay(20)
                 val tenMinutesAgo = Instant.now().minus(10, ChronoUnit.MINUTES)
-                logger.debug("/monitor lastPing:      ${lastPing.toHttpDateString()}")
-                logger.debug("/monitor tenMinutesAgo: ${tenMinutesAgo.toHttpDateString()}")
+                logger.debug("/monitor lastPing:      $lastPing")
+                logger.debug("/monitor tenMinutesAgo: $tenMinutesAgo")
                 val status = if (lastPing.isBefore(tenMinutesAgo)) {
-                        logger.debug("/monitor HttpStatusCode.InternalServerError")
-                        HttpStatusCode.InternalServerError
-                    } else {
+                    logger.debug("/monitor HttpStatusCode.InternalServerError")
+                    HttpStatusCode.InternalServerError
+                } else {
                     logger.debug("/monitor HttpStatusCode.OK")
-                        HttpStatusCode.OK
-                    }
-                call.respond(status, mapOf("lastPing" to lastPing.getEpochSecond()))
+                    HttpStatusCode.OK
+                }
+                call.respond(status, mapOf("lastPing" to lastPing.epochSecond))
             }
 
             post("/ping") {
                 logger.info("/ping received request")
                 lastPing = Instant.now()
-                logger.debug("/ping lastPing: ${lastPing.toHttpDateString()}")
-                call.respond(HttpStatusCode.OK, mapOf("lastPing" to lastPing.getEpochSecond()))
+                logger.debug("/ping lastPing: $lastPing")
+                call.respond(HttpStatusCode.OK, mapOf("lastPing" to lastPing.epochSecond))
             }
         }
     }
@@ -123,7 +117,7 @@ fun tokenValid(reqToken: String?, account: String, timestamp: String?, deviceTok
 
     if (reqToken != null) {
         val expectedToken =
-            String(Hex.encodeHex(DigestUtils.sha1("$account-$timestamp-$deviceToken}"))).toUpperCase(Locale.getDefault())
+            String(Hex.encodeHex(DigestUtils.sha1("$account-$timestamp-$deviceToken}"))).uppercase(Locale.getDefault())
         valid = reqToken == expectedToken
         logger.trace("account: $account, timestamp: $timestamp, deviceToken: $deviceToken")
         logger.debug("token valid: $valid - received '$reqToken' / expected '$expectedToken'")
@@ -142,7 +136,7 @@ internal suspend fun dispatchProxyRequest(
     port: Int = 8080
 ) {
     val accountDevice = "${account}_$deviceToken"
-    if (bgWorkerQueue.contains(accountDevice)) {  // already queued
+    if (bgWorkerQueue.contains(accountDevice)) {
         logger.warn("request already queued")
         return
     }
@@ -157,4 +151,3 @@ internal suspend fun dispatchProxyRequest(
         logger.info("bg worker queue size: ${bgWorkerQueue.size}")
     }
 }
-

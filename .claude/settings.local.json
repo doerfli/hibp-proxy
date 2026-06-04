@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileKotlin)",
+      "Bash(curl -s \"https://search.maven.org/solrsearch/select?q=g:io.ktor+AND+a:ktor-server*metrics*&rows=20&wt=json\")",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(d['a'], d['latestVersion']\\) for d in data['response']['docs']]\")",
+      "WebSearch",
+      "WebFetch(domain:api.ktor.io)",
+      "WebFetch(domain:ktor.io)",
+      "WebFetch(domain:central.sonatype.com)",
+      "WebFetch(domain:mvnrepository.com)",
+      "Bash(./gradlew test *)"
+    ]
+  }
+}

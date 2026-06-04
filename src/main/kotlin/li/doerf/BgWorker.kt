@@ -1,19 +1,20 @@
 package li.doerf
 
-import com.github.kittinunf.fuel.coroutines.awaitStringResponse
-import com.github.kittinunf.fuel.coroutines.awaitStringResponseResult
-import com.github.kittinunf.fuel.httpGet
-import com.github.kittinunf.fuel.httpPost
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
@@ -28,9 +29,10 @@ import java.util.concurrent.TimeUnit
 
 private const val requestInterval = 1500L
 private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
-private val firebaseCredentials =  Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
+private val firebaseCredentials = Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
 private val logger: Logger = LoggerFactory.getLogger("BgWorker")
 private var nextRequestAfter = Instant.now()
+private val httpClient = HttpClient(CIO)
 
 
 fun initializeFirebaseApp() {
@@ -40,28 +42,32 @@ fun initializeFirebaseApp() {
     FirebaseApp.initializeApp(options)
 }
 
-fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> = actor(capacity = 500) {
-    logger.info("BgWorker starting")
-    logger.trace("hibp api key: $apiKey")
-    logger.trace(String(firebaseCredentials))
-    initializeFirebaseApp()
+fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> {
+    val channel = Channel<ProxyRequest>(500)
+    launch {
+        logger.info("BgWorker starting")
+        logger.trace("hibp api key: $apiKey")
+        logger.trace(String(firebaseCredentials))
+        initializeFirebaseApp()
 
-    for (msg in channel) {
-        logger.info("proxy request received ${msg.requestId}")
-        logger.trace("$msg")
-        try {
-            if (isPing(msg)) {
-                bgWorkerQueue.remove("${msg.account}_${msg.deviceToken}")
-                continue  // handle ping request and continue
+        for (msg in channel) {
+            logger.info("proxy request received ${msg.requestId}")
+            logger.trace("$msg")
+            try {
+                if (isPing(msg)) {
+                    bgWorkerQueue.remove("${msg.account}_${msg.deviceToken}")
+                    continue
+                }
+                doProxyRequestWithRetries(msg)
+            } finally {
+                val accountDevice = "${msg.account}_${msg.deviceToken}"
+                bgWorkerQueue.remove(accountDevice)
+                logger.info("request finished ${msg.requestId} (remaining queue size: ${bgWorkerQueue.size})")
             }
-            doProxyRequestWithRetries(msg)
-        } finally {
-            val accountDevice = "${msg.account}_${msg.deviceToken}"
-            bgWorkerQueue.remove(accountDevice)
-            logger.info("request finished ${msg.requestId} (remaining queue size: ${bgWorkerQueue.size})")
         }
+        logger.info("BgWorker exiting")
     }
-    logger.info("BgWorker exiting")
+    return channel
 }
 
 private suspend fun doProxyRequestWithRetries(msg: ProxyRequest) {
@@ -69,7 +75,7 @@ private suspend fun doProxyRequestWithRetries(msg: ProxyRequest) {
     do {
         try {
             processProxyRequest(msg)
-            retry = 0  // finished
+            retry = 0
         } catch (e: TooManyRequestsException) {
             logger.warn("retry after $nextRequestAfter")
         } catch (e: IOException) {
@@ -92,8 +98,8 @@ private suspend fun processProxyRequest(request: ProxyRequest) {
 
 private suspend fun isPing(x: ProxyRequest): Boolean {
     if (x.ping) {
-        val (_, response, _) = "http://localhost:${x.port}/ping".httpPost().awaitStringResponse()
-        logger.info("processed ping request. response status code: ${response.statusCode}")
+        val response = httpClient.post("http://localhost:${x.port}/ping")
+        logger.info("processed ping request. response status code: ${response.status.value}")
         return true
     }
     return false
@@ -113,24 +119,25 @@ suspend fun isPwned(account: String): Pair<Boolean, String> {
     val accountUrlEncoded = URLEncoder.encode(account, Charset.defaultCharset())
     val url = "https://haveibeenpwned.com/api/v3/breachedaccount/$accountUrlEncoded"
     logger.info("sending request to haveibeenpwned.com")
-    val (_, response, _) =
-        url.httpGet()
-            .header("Hibp-Api-Key", apiKey)
-            .header("UserAgent", "hibp-proxy_for_hacked_android_app")
-            .header("Hibp-Version", "1.0")
-            .awaitStringResponseResult()
+    val response = httpClient.get(url) {
+        headers {
+            append("Hibp-Api-Key", apiKey)
+            append("User-Agent", "hibp-proxy_for_hacked_android_app")
+            append("Hibp-Version", "1.0")
+        }
+    }
     nextRequestAfter = Instant.now().plusMillis(requestInterval)
-    logger.info("response status code: ${response.statusCode}")
-    if (response.statusCode == HttpStatusCode.TooManyRequests.value) {
-        val retryAfter = response.header("retry-after").first().toLong()
+    logger.info("response status code: ${response.status.value}")
+    if (response.status.value == HttpStatusCode.TooManyRequests.value) {
+        val retryAfter = response.headers["retry-after"]?.toLong() ?: 60L
         logger.warn("received 429 - retry after ${retryAfter}s")
         nextRequestAfter = Instant.now().plus(retryAfter, ChronoUnit.SECONDS)
         throw TooManyRequestsException()
     }
-    val responseString = response.body().asString("application/json")
+    val responseString = response.bodyAsText()
     logger.trace("hibp response: $responseString")
-    val success = response.statusCode == HttpStatusCode.OK.value
-    return Pair(success, if (success) { responseString } else { "[]" })
+    val success = response.status == HttpStatusCode.OK
+    return Pair(success, if (success) responseString else "[]")
 }
 
 fun notifyDevice(deviceToken: String, account: String, response: String) {

@@ -7,8 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor != 'dependabot[bot]'
     steps:
-      - uses: actions/checkout@v1
-      - uses: rlespinasse/github-slug-action@v2.x
+      - uses: actions/checkout@v4
+      - uses: rlespinasse/github-slug-action@v4
       - name: Login to registry
         run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u doerfli --password-stdin
       - name: Build container
