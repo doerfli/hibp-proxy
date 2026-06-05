@@ -51,11 +51,11 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> {
         initializeFirebaseApp()
 
         for (msg in channel) {
+            lastPing = Instant.now()
             logger.info("proxy request received ${msg.requestId}")
             logger.trace("$msg")
             try {
-                if (isPing(msg)) {
-                    bgWorkerQueue.remove("${msg.account}_${msg.deviceToken}")
+                if (msg.ping) {
                     continue
                 }
                 doProxyRequestWithRetries(msg)
@@ -77,6 +77,7 @@ private suspend fun doProxyRequestWithRetries(msg: ProxyRequest) {
             processProxyRequest(msg)
             retry = 0
         } catch (e: TooManyRequestsException) {
+            retry--
             logger.warn("retry after $nextRequestAfter")
         } catch (e: IOException) {
             retry--
@@ -96,14 +97,6 @@ private suspend fun processProxyRequest(request: ProxyRequest) {
     notifyDevice(request.deviceToken, request.account, hibpResponse)
 }
 
-private suspend fun isPing(x: ProxyRequest): Boolean {
-    if (x.ping) {
-        val response = httpClient.post("http://localhost:${x.port}/ping")
-        logger.info("processed ping request. response status code: ${response.status.value}")
-        return true
-    }
-    return false
-}
 
 suspend fun delayIfRequired() {
     logger.debug("next request after: $nextRequestAfter - now: ${Instant.now()}")
