@@ -7,14 +7,19 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
@@ -32,7 +37,13 @@ private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
 private val firebaseCredentials = Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
 private val logger: Logger = LoggerFactory.getLogger("BgWorker")
 private var nextRequestAfter = Instant.now()
-private val httpClient = HttpClient(CIO)
+private val httpClient = HttpClient(CIO) {
+    install(HttpTimeout) {
+        requestTimeoutMillis = 10_000
+        connectTimeoutMillis = 5_000
+        socketTimeoutMillis = 10_000
+    }
+}
 
 
 fun initializeFirebaseApp() {
@@ -71,23 +82,29 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> {
 }
 
 private suspend fun doProxyRequestWithRetries(msg: ProxyRequest) {
-    var retry = 3
-    do {
-        try {
-            processProxyRequest(msg)
-            retry = 0
-        } catch (e: TooManyRequestsException) {
-            retry--
-            logger.warn("retry after $nextRequestAfter")
-        } catch (e: IOException) {
-            retry--
-            nextRequestAfter = nextRequestAfter.plus(5, ChronoUnit.SECONDS)
-            logger.warn("caught IOException, retrying in 5 seconds", e)
-        } catch (e: Exception) {
-            retry--
-            logger.error("unexpected exception", e)
+    try {
+        withTimeout(30_000) {
+            var retry = 3
+            do {
+                try {
+                    processProxyRequest(msg)
+                    retry = 0
+                } catch (e: TooManyRequestsException) {
+                    retry--
+                    logger.warn("retry after $nextRequestAfter")
+                } catch (e: IOException) {
+                    retry--
+                    nextRequestAfter = nextRequestAfter.plus(5, ChronoUnit.SECONDS)
+                    logger.warn("caught IOException, retrying in 5 seconds", e)
+                } catch (e: Exception) {
+                    retry--
+                    logger.error("unexpected exception", e)
+                }
+            } while (retry > 0)
         }
-    } while (retry > 0)
+    } catch (e: TimeoutCancellationException) {
+        logger.warn("giving up on request ${msg.requestId} after 30s", e)
+    }
 }
 
 private suspend fun processProxyRequest(request: ProxyRequest) {
@@ -133,7 +150,7 @@ suspend fun isPwned(account: String): Pair<Boolean, String> {
     return Pair(success, if (success) responseString else "[]")
 }
 
-fun notifyDevice(deviceToken: String, account: String, response: String) {
+suspend fun notifyDevice(deviceToken: String, account: String, response: String) {
     logger.trace("building fcm message")
     val message = Message.builder()
         .putData("account", account)
@@ -143,6 +160,8 @@ fun notifyDevice(deviceToken: String, account: String, response: String) {
         .build()
 
     logger.debug("sending fcm response")
-    val fcmResponse = FirebaseMessaging.getInstance().sendAsync(message)[10, TimeUnit.SECONDS]
+    val fcmResponse = withContext(Dispatchers.IO) {
+        FirebaseMessaging.getInstance().sendAsync(message)[10, TimeUnit.SECONDS]
+    }
     logger.info("sent fcm message: $fcmResponse")
 }
