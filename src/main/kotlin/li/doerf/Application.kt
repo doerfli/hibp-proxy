@@ -31,6 +31,11 @@ val dotenv = dotenv {
 val bgWorkerQueue = Collections.synchronizedSet(mutableSetOf<String>())
 @Volatile var lastPing: Instant = Instant.now()
 
+// /monitor reports unhealthy when the worker heartbeat is older than this. Kept
+// comfortably above the worker's heartbeat interval so a healthy (busy or idle)
+// worker never trips a false alarm.
+private const val heartbeatStaleMinutes = 2L
+
 fun main() {
     val appScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     val bgworker = appScope.createBgWorker()
@@ -82,9 +87,10 @@ fun main() {
 
             get("/monitor") {
                 logger.info("/monitor received request")
-                dispatchProxyRequest("dummy", "dummy", bgworker, true)
-                val tenMinutesAgo = Instant.now().minus(10, ChronoUnit.MINUTES)
-                val status = if (lastPing.isBefore(tenMinutesAgo)) {
+                // Pure liveness read: the worker keeps lastPing fresh on its own
+                // heartbeat, so a stale value means the worker is genuinely stuck.
+                val staleThreshold = Instant.now().minus(heartbeatStaleMinutes, ChronoUnit.MINUTES)
+                val status = if (lastPing.isBefore(staleThreshold)) {
                     HttpStatusCode.InternalServerError
                 } else {
                     HttpStatusCode.OK
@@ -119,8 +125,7 @@ fun tokenValid(reqToken: String?, account: String, timestamp: String?, deviceTok
 internal suspend fun dispatchProxyRequest(
     account: String,
     deviceToken: String,
-    bgworker: SendChannel<ProxyRequest>,
-    ping: Boolean = false
+    bgworker: SendChannel<ProxyRequest>
 ) {
     val accountDevice = "${account}_$deviceToken"
     if (bgWorkerQueue.contains(accountDevice)) {
@@ -128,7 +133,7 @@ internal suspend fun dispatchProxyRequest(
         return
     }
     withContext(Dispatchers.Default) {
-        val r = ProxyRequest(UUID.randomUUID(), account, deviceToken, ping)
+        val r = ProxyRequest(UUID.randomUUID(), account, deviceToken)
         logger.debug("sending proxy request ${r.requestId}")
         bgworker.send(r)
         bgWorkerQueue.add(accountDevice)

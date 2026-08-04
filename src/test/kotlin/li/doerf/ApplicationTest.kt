@@ -29,7 +29,7 @@ class ApplicationTest {
         assertTrue(bgWorkerQueue.isEmpty())
 
         runBlocking {
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false)
+            dispatchProxyRequest(account, deviceToken, bgWorkerMock)
 
             assertThat(bgWorkerQueue.size).isEqualTo(1)
             verify(bgWorkerMock).send(capture(captor))
@@ -38,7 +38,6 @@ class ApplicationTest {
             assertThat(r.account).isEqualTo(account)
             assertThat(r.deviceToken).isEqualTo(deviceToken)
             assertThat(r.requestId).isNotNull()
-            assertThat(r.ping).isFalse()
         }
     }
 
@@ -53,33 +52,13 @@ class ApplicationTest {
         assertTrue(bgWorkerQueue.isEmpty())
 
         runBlocking {
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false)
+            dispatchProxyRequest(account, deviceToken, bgWorkerMock)
 
             assertThat(bgWorkerQueue.size).isEqualTo(1)
 
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, false)
+            dispatchProxyRequest(account, deviceToken, bgWorkerMock)
             assertThat(bgWorkerQueue.size).isEqualTo(1)
         }
     }
 
-    @Test
-    fun testDispatchProxyRequestPing() {
-        val account = "accoutName"
-        val deviceToken = "deviceToken"
-        val bgWorkerMock = mock(SendChannel::class.java) as SendChannel<ProxyRequest>
-        val captor: ArgumentCaptor<ProxyRequest> = ArgumentCaptor.forClass(ProxyRequest::class.java)
-
-        bgWorkerQueue.clear()
-        assertTrue(bgWorkerQueue.isEmpty())
-
-        runBlocking {
-            dispatchProxyRequest(account, deviceToken, bgWorkerMock, true)
-
-            assertThat(bgWorkerQueue.size).isEqualTo(1)
-            verify(bgWorkerMock).send(capture(captor))
-
-            val r = captor.value
-            assertThat(r.ping).isTrue()
-        }
-    }
 }

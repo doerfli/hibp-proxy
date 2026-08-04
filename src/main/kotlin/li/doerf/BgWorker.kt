@@ -13,11 +13,15 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.onTimeout
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.slf4j.Logger
@@ -33,6 +37,10 @@ import java.util.concurrent.TimeUnit
 
 
 private const val requestInterval = 1500L
+
+// How often the worker refreshes the liveness heartbeat while idle. Must stay
+// well below the /monitor staleness threshold so an idle worker never looks dead.
+private const val heartbeatInterval = 30_000L
 private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
 private val firebaseCredentials = Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
 private val logger: Logger = LoggerFactory.getLogger("BgWorker")
@@ -60,25 +68,49 @@ fun CoroutineScope.createBgWorker(): SendChannel<ProxyRequest> {
         logger.trace("hibp api key: $apiKey")
         logger.trace(String(firebaseCredentials))
         initializeFirebaseApp()
-
-        for (msg in channel) {
-            lastPing = Instant.now()
-            logger.info("proxy request received ${msg.requestId}")
-            logger.trace("$msg")
-            try {
-                if (msg.ping) {
-                    continue
-                }
-                doProxyRequestWithRetries(msg)
-            } finally {
-                val accountDevice = "${msg.account}_${msg.deviceToken}"
-                bgWorkerQueue.remove(accountDevice)
-                logger.info("request finished ${msg.requestId} (remaining queue size: ${bgWorkerQueue.size})")
-            }
-        }
+        runWorkerLoop(channel)
         logger.info("BgWorker exiting")
     }
     return channel
+}
+
+/**
+ * Single-consumer loop that serializes all proxy requests. On every iteration it
+ * refreshes the [lastPing] heartbeat — either when a message arrives, or on an
+ * idle timeout every [heartbeatIntervalMs] — so [lastPing] reflects "the worker is
+ * alive and looping" rather than "the worker last processed a request". That is
+ * what keeps /monitor from false-alarming during idle periods.
+ *
+ * [select] with [onReceiveCatching] (rather than a timeout wrapped around
+ * `receive()`) guarantees the idle timeout can never drop an in-flight message:
+ * exactly one clause is committed to per iteration.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal suspend fun runWorkerLoop(
+    channel: ReceiveChannel<ProxyRequest>,
+    heartbeatIntervalMs: Long = heartbeatInterval,
+    process: suspend (ProxyRequest) -> Unit = { doProxyRequestWithRetries(it) }
+) {
+    while (!channel.isClosedForReceive) {
+        select {
+            channel.onReceiveCatching { result ->
+                lastPing = Instant.now()
+                val msg = result.getOrNull() ?: return@onReceiveCatching // channel closed
+                logger.info("proxy request received ${msg.requestId}")
+                logger.trace("$msg")
+                try {
+                    process(msg)
+                } finally {
+                    val accountDevice = "${msg.account}_${msg.deviceToken}"
+                    bgWorkerQueue.remove(accountDevice)
+                    logger.info("request finished ${msg.requestId} (remaining queue size: ${bgWorkerQueue.size})")
+                }
+            }
+            onTimeout(heartbeatIntervalMs) {
+                lastPing = Instant.now() // idle heartbeat
+            }
+        }
+    }
 }
 
 private suspend fun doProxyRequestWithRetries(msg: ProxyRequest) {
