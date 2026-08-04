@@ -42,7 +42,10 @@ private const val requestInterval = 1500L
 // well below the /monitor staleness threshold so an idle worker never looks dead.
 private const val heartbeatInterval = 30_000L
 private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
-private val firebaseCredentials = Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"])
+// Decoded lazily so merely referencing this file's top-level workers (e.g. in
+// tests) does not force the decode; the value is still required at startup when
+// initializeFirebaseApp() first touches it.
+private val firebaseCredentials by lazy { Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"]) }
 private val logger: Logger = LoggerFactory.getLogger("BgWorker")
 private var nextRequestAfter = Instant.now()
 private val httpClient = HttpClient(CIO) {
