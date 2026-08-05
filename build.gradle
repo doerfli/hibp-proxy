@@ -11,6 +11,19 @@ version = '0.0.1'
 
 application {
     mainClass = "li.doerf.ApplicationKt"
+    // Footprint tuning. This service is I/O-bound with a single-consumer worker and a
+    // low allocation rate, so G1's reserved regions and C2's code cache are mostly
+    // wasted resident memory. Without an explicit -Xmx the JVM would size max heap at
+    // ~25% of host RAM.
+    // -Xss is deliberately left at the default: thread stacks are committed lazily, so
+    // shrinking it saves little resident memory while risking StackOverflowError on the
+    // deepest path here (the outbound TLS handshake to HIBP).
+    applicationDefaultJvmArgs = [
+        "-XX:+UseSerialGC",
+        "-Xmx64m",
+        "-XX:MaxMetaspaceSize=128m",
+        "-XX:TieredStopAtLevel=1",
+    ]
 }
 
 repositories {
