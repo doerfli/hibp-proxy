@@ -90,7 +90,12 @@ class BgWorkerTest {
      */
     @Test
     fun refreshesHeartbeatDuringRateLimitWait(): Unit = runBlocking {
-        nextRequestAfter = Instant.now().plusMillis(250)
+        // Window is set far enough in the future that the launched coroutine is
+        // guaranteed to still be mid-wait when observed, however slowly it is
+        // scheduled. A short window could close before the coroutine entered the
+        // wait loop, so awaitRateLimit would return without ever refreshing
+        // lastPing — a race that flaked on slow CI runners.
+        nextRequestAfter = Instant.now().plusSeconds(10)
         val staleValue = Instant.now().minusSeconds(3600)
         lastPing = staleValue
 
@@ -102,6 +107,7 @@ class BgWorkerTest {
         }
 
         assertThat(lastPing).isAfter(staleValue)
-        job.join()
+        job.cancel()                     // stop the long wait instead of joining it
+        nextRequestAfter = Instant.now() // don't leak a future-dated window to other tests
     }
 }
