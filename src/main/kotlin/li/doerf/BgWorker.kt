@@ -11,6 +11,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,6 +35,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.math.min
 
 
 private const val requestInterval = 1500L
@@ -47,7 +49,7 @@ private val apiKey = dotenv.get("HIBP_API_KEY", "xxxxx")
 // initializeFirebaseApp() first touches it.
 private val firebaseCredentials by lazy { Base64.getDecoder().decode(dotenv["FIREBASE_CREDENTIALS"]) }
 private val logger: Logger = LoggerFactory.getLogger("BgWorker")
-private var nextRequestAfter = Instant.now()
+internal var nextRequestAfter = Instant.now()
 private val httpClient = HttpClient(CIO) {
     install(HttpTimeout) {
         requestTimeoutMillis = 10_000
@@ -117,46 +119,49 @@ internal suspend fun runWorkerLoop(
 }
 
 private suspend fun doProxyRequestWithRetries(msg: ProxyRequest) {
-    try {
-        withTimeout(30_000) {
-            var retry = 3
-            do {
-                try {
-                    processProxyRequest(msg)
-                    retry = 0
-                } catch (e: TooManyRequestsException) {
-                    retry--
-                    logger.warn("retry after $nextRequestAfter")
-                } catch (e: IOException) {
-                    retry--
-                    nextRequestAfter = nextRequestAfter.plus(5, ChronoUnit.SECONDS)
-                    logger.warn("caught IOException, retrying in 5 seconds", e)
-                } catch (e: Exception) {
-                    retry--
-                    logger.error("unexpected exception", e)
-                }
-            } while (retry > 0)
+    var retry = 3
+    do {
+        lastPing = Instant.now()                              // heartbeat before each ≤30s attempt
+        awaitRateLimit()                                      // honor spacing / retry-after (heartbeat-safe)
+        try {
+            withTimeout(30_000) { processProxyRequest(msg) }  // bound the network work only
+            retry = 0
+        } catch (e: TooManyRequestsException) {
+            retry--                                           // isPwned set nextRequestAfter; loop waits it out
+            logger.warn("received 429, will wait until $nextRequestAfter then retry ($retry left)")
+        } catch (e: TimeoutCancellationException) {
+            retry--                                           // network hang — retry rather than drop
+            logger.warn("request ${msg.requestId} timed out after 30s, retrying ($retry left)")
+        } catch (e: IOException) {
+            retry--
+            nextRequestAfter = nextRequestAfter.plus(5, ChronoUnit.SECONDS)
+            logger.warn("caught IOException, retrying in 5 seconds ($retry left)", e)
+        } catch (e: CancellationException) {
+            throw e                                           // genuine worker cancellation — never swallow
+        } catch (e: Exception) {
+            retry--
+            logger.error("unexpected exception", e)
         }
-    } catch (e: TimeoutCancellationException) {
-        logger.warn("giving up on request ${msg.requestId} after 30s", e)
-    }
+    } while (retry > 0)
 }
 
 private suspend fun processProxyRequest(request: ProxyRequest) {
-    delayIfRequired()
     val (pwned, hibpResponse) = isPwned(request.account)
     logger.trace("account (${request.account}) pwned? $pwned")
     notifyDevice(request.deviceToken, request.account, hibpResponse)
 }
 
-
-suspend fun delayIfRequired() {
-    logger.debug("next request after: $nextRequestAfter - now: ${Instant.now()}")
-    val requestAllowed = Instant.now().isAfter(nextRequestAfter)
-    if (!requestAllowed) {
-        val sleepFor = nextRequestAfter.toEpochMilli() - Instant.now().toEpochMilli()
-        logger.debug("sleeping for ${sleepFor}ms")
-        delay(sleepFor)
+/**
+ * Wait until the rate-limit window ([nextRequestAfter]) clears. The wait is
+ * chunked so a long HIBP retry-after keeps refreshing the [lastPing] heartbeat and
+ * never trips /monitor. Unlike the bounded network call, this wait is deliberately
+ * not capped — the single-consumer worker serializes the whole queue behind it.
+ */
+internal suspend fun awaitRateLimit(chunkMs: Long = heartbeatInterval) {
+    while (Instant.now().isBefore(nextRequestAfter)) {
+        val remaining = nextRequestAfter.toEpochMilli() - Instant.now().toEpochMilli()
+        delay(min(remaining, chunkMs))
+        lastPing = Instant.now()
     }
 }
 

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(./gradlew compileTestKotlin)",
       "Bash(./gradlew test *)",
-      "Bash(./gradlew clean *)"
+      "Bash(./gradlew clean *)",
+      "Bash(./gradlew compileTestKotlin --console=plain)"
     ]
   }
 }
