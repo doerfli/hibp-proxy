@@ -1,5 +1,5 @@
-# [Choice] Java version (use -bullseye variants on local arm64/Apple Silicon): 11, 17, 11-bullseye, 17-bullseye, 11-buster, 17-buster
-ARG VARIANT=11-bullseye
+# [Choice] Java version (use -bullseye variants on local arm64/Apple Silicon): 21, 25, 21-bookworm, 25-bookworm, 21-bullseye, 25-bullseye
+ARG VARIANT=25-bookworm
 FROM mcr.microsoft.com/devcontainers/java:${VARIANT}
 
 # [Option] Install Maven
