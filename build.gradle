@@ -1,11 +1,13 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id 'org.jetbrains.kotlin.jvm' version "$kotlin_version"
     id 'application'
     id 'com.github.ben-manes.versions' version "$benManesVersion"
 }
 
-group 'li.doerf'
-version '0.0.1'
+group = 'li.doerf'
+version = '0.0.1'
 
 application {
     mainClass = "li.doerf.ApplicationKt"
@@ -31,26 +33,21 @@ dependencies {
     implementation("io.github.cdimascio:dotenv-kotlin:$dotenv_version")
     implementation("com.google.firebase:firebase-admin:$firebase_admin_sdk_version")
     testImplementation("org.junit.jupiter:junit-jupiter:${junitVersion}")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core:${mockitoVersion}")
     testImplementation("org.assertj:assertj-core:${assertJVersion}")
 }
 
-compileKotlin {
-    kotlinOptions {
-        freeCompilerArgs = ["-Xjsr305=strict"]
-        jvmTarget = "21"
+kotlin {
+    jvmToolchain(25)
+    compilerOptions {
+        freeCompilerArgs.add("-Xjsr305=strict")
+        jvmTarget = JvmTarget.JVM_25
     }
 }
 
-compileTestKotlin {
-    kotlinOptions {
-        freeCompilerArgs = ["-Xjsr305=strict"]
-        jvmTarget = "21"
-    }
-}
-
-task stage {
-    dependsOn installDist
+tasks.register('stage') {
+    dependsOn 'installDist'
 }
 
 tasks.test {

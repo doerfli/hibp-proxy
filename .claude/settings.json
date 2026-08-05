@@ -4,7 +4,17 @@
       "Bash(./gradlew compileTestKotlin)",
       "Bash(./gradlew test *)",
       "Bash(./gradlew clean *)",
-      "Bash(./gradlew compileTestKotlin --console=plain)"
+      "Bash(./gradlew compileTestKotlin --console=plain)",
+      "Bash(curl -s \"https://search.maven.org/solrsearch/select?q=g:org.jetbrains.kotlin+AND+a:kotlin-stdlib&core=gav&rows=5&wt=json\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" https://repo1.maven.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.3.20/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://mcr.microsoft.com/v2/devcontainers/java/tags/list\")",
+      "Bash(curl -s \"https://mcr.microsoft.com/v2/devcontainers/java/tags/list\")",
+      "Bash(java -version)",
+      "Read(//usr/lib/jvm/**)",
+      "Bash(./gradlew help *)",
+      "Bash(grep -iA6 \"deprecat\")",
+      "Bash(docker build *)",
+      "Bash(docker rmi *)"
     ]
   }
 }
