@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id 'org.jetbrains.kotlin.jvm' version "$kotlin_version"
     id 'application'
-    id 'com.github.ben-manes.versions' version "$benManesVersion"
+    id 'io.github.ben-manes.versions' version "$benManesVersion"
 }
 
 group = 'li.doerf'

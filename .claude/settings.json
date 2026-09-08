@@ -14,7 +14,11 @@
       "Bash(./gradlew help *)",
       "Bash(grep -iA6 \"deprecat\")",
       "Bash(docker build *)",
-      "Bash(docker rmi *)"
+      "Bash(docker rmi *)",
+      "Bash(./gradlew wrapper *)",
+      "Bash(./gradlew build *)",
+      "Bash(timeout 20 ./gradlew run --console=plain)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }
